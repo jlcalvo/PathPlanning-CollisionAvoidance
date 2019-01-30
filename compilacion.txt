@@ -1,0 +1,5 @@
+CONTROLADOR CENTRALIZADO CON RECURSOS COMPARTIDOS Y LUGAR MONITOR
+
+Compilador utilizado: MinGW compiler
+
+g++ -o control.exe Localizacion_de_multiples_robots_moviles.cpp Petri_Net.cpp Graph.cpp dijkstra.cpp VoronoiDiagram.cpp Process.cpp Segment.cpp Point.cpp obstacles_filter.cpp petri.cpp matrix.cpp  -IC:\Users\Usuario\Documents\boost\boost_1_66_0\boost_1_66_0\ -std=c++0x
