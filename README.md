@@ -5,3 +5,7 @@ Inputs:
   - Boundaries of the workspace
   - Obstacles
   - Start and Target point for each robot
+
+main(): 
+  - Path-planning
+  - Centralized controller
