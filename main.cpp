@@ -28,7 +28,6 @@
 #include "../cpp/obstacles_filter.cpp"
 
 
-
 typedef unsigned long DWORD;
 typedef unsigned short WORD;
 typedef unsigned int UNINT32;
@@ -51,7 +50,7 @@ std::vector<int> marcat_new_monitor;
 bool go = false;
 int counttt = 0; // contatore per inviare una sola volta tutte le traiettorie
 bool aver = false;
-const int NUM_SECONDS = 4;
+const int NUM_SECONDS = 2;
 
 int ancho = 640, alto = 480;	//Resolución de la cámara  1280 x 720 pixeles or 1920 x 1080 pixeles 
 unsigned int ncamara=0;		//Número de la cámara que se va a utilizar
@@ -88,10 +87,10 @@ std::vector<int> control;
 std::vector<std::string> modo = {"active","active","active"};
 
 int hh =0;
-
+std::vector<std::vector<std::vector <double> > > identificacion;
 int width = (int)((largop *100)-28-15); //larghezza in cm eliminando i bordi (tratti non percorribili)
 int height = (int)((anchop *100)-14-15); //altezza in cm eliminando i bordi (tratti non percorribili)
-
+std::ofstream fout3;
 int USB;
 
 int setUSB(){
@@ -677,7 +676,7 @@ void send_packet_WiFi(double x_act, double y_act, double theta_act, int num_coch
 	return ;
 }
 
-bool shared_resource(std::vector<int> vec) {
+bool is_shared_resource(std::vector<int> vec) {
 	bool b = false;
 	int count = 0;
 	for (unsigned int i = 0; i < vec.size(); ++i) {
@@ -691,7 +690,9 @@ std::vector<int> search_in_matrix(int tj, std::vector<std::vector<int>> pre, std
 	std::vector<int> resources_involved;
 	for (unsigned int i = 0; i < r.size(); ++i) {
 		if (pre[r[i] - 1][tj] == 1) {
-			resources_involved.push_back(r[i]);
+			if (is_shared_resource(pre[r[i]-1])) {
+				resources_involved.push_back(r[i]);
+			}
 		}
 	}
 	return resources_involved;
@@ -718,7 +719,11 @@ bool resource_available(std::vector<int> z, std::vector<int> *capacities) {
 }
 
 
-
+bool distancia (std::vector<double> pos_actual, std::vector<double> pos_objetivo, double dist_min) {
+	double distancia = sqrt ( pow(pos_objetivo[0]-pos_actual[0]/100,2) + pow (pos_objetivo[1]-pos_actual[1]/100,2));
+	if (distancia > dist_min) { return false;}
+	else return true;
+}
 
 int main(int argc,char **argv)
 {
@@ -757,9 +762,8 @@ int main(int argc,char **argv)
     	Capturadevideo.set(CV_CAP_PROP_FRAME_WIDTH, ancho);
     	Capturadevideo.set(CV_CAP_PROP_FRAME_HEIGHT, alto);
     	double Brightness;
-		Capturadevideo.set(CV_CAP_PROP_BRIGHTNESS,Brightness);
-		Capturadevideo.set(CV_CAP_PROP_FPS, 60);
-
+	Capturadevideo.set(CV_CAP_PROP_BRIGHTNESS,Brightness);
+	Capturadevideo.set(CV_CAP_PROP_FPS, 60);
 
     	usleep(1000000);
     	//Comprobar si el video se abre
@@ -776,139 +780,205 @@ int main(int argc,char **argv)
 
 		clock_t this_time = clock();
 		clock_t last_time = this_time;
-
-
+//		Capturadevideo.retrieve(Imagen);
 	do{
-			this_time = clock();
-			time_counter += (double)(this_time - last_time);
-			last_time = this_time;
-			Capturadevideo.retrieve(Imagen);
-			Mat im = Imagen.clone();
-//			cout << "Pause: ";
-//			cin.get();
-			Eng::Eng_Process(nrobots, anchop, largop, im, aver, go, esquinafinal, esquina, Robotmundo, Robotm, punto1mundo, punto2mundo, obstaculo, point_color_struct);
-    		
-    		// lista dei robot
-    		std::vector<vector<double> > robotcm;
-    		// Ogni robot avra' un vettore di tre elementi: x,y, theta (orientamento)
-    		// la coppia x,y rappresenta il PUNTO DI PARTENZA di ogni robot
-    		std::vector<double> rob_tempVar;
-            if (aver){
-				
-				for (int i = 0; i < nrobots; i++) {
-
-					theta = (atan2((punto2mundo[i].y - punto1mundo[i].y), (punto2mundo[i].x - punto1mundo[i].x)));
-					rob_tempVar.push_back((int)(Robotm[i].x * 100));
-					rob_tempVar.push_back((int)(Robotm[i].y * 100));
-					rob_tempVar.push_back(theta);
-
-					robotcm.push_back(rob_tempVar);
-					cout << "salida del modulo de vision" << endl;
-
-					cout << "Robotcm[" << i + 1 << "](x,y,theta):" << robotcm[i][0] << " " << robotcm[i][1] << " " << robotcm[i][2] << endl;
-
-					rob_tempVar.clear();
-				}
+		this_time = clock();
+		time_counter += (double)(this_time - last_time);
+		last_time = this_time;
+		Capturadevideo.read(Imagen);
+		Mat im = Imagen.clone();
+	
+		Eng::Eng_Process(nrobots, anchop, largop, im, aver, go, esquinafinal, esquina, Robotmundo, Robotm, punto1mundo, punto2mundo, obstaculo, point_color_struct);
 		
-
+    		std::vector<vector<double> > robotcm; // lista de robots
+    		// Cada robot tendrá un vector de tres elementos: x, y, theta (orientación)
+    		// el par x, y representa el punto de inicio de cada robot
+    		std::vector<double> rob_tempVar;
+		if (aver){
+				
+		 for( int i=0;i<nrobots;i++)
+			{
+				theta=(atan2((punto2mundo[i].y-punto1mundo[i].y),(punto2mundo[i].x-punto1mundo[i].x)));
+				rob_tempVar.push_back((int)(Robotm[i].x*100));
+				rob_tempVar.push_back((int)(Robotm[i].y*100));
+				rob_tempVar.push_back(theta);
+				robotcm.push_back(rob_tempVar);
+				
+				rob_tempVar.clear();
+			}		
+		
             	std::vector<vector<vector <double> > > paths;
             	std::vector<int> seq_celle_occ;
 
             	/*CALCULO DE TRAYECTORIAS */
+            	if(counttt == 0){   //Primera vez que se ejecuta el programa (calculo de trayectorias y envio al robot)
+			cout<<"Salida del modulo de vision"<< endl;
+			for( int i=0;i<nrobots;i++){
+				cout<<"Robot["<<i+1<<"]=("<<robotcm[i][0]<<","<<robotcm[i][1]<<","<<robotcm[i][2]<<") -- (x,y,theta)"<<endl;
+			}
+			obstacles_filter(&obstaculo,area_minima);
 
+			std::ofstream fout2("obstacles.txt");
+			fout2<<"[";
+			for(int ii=0;ii<obstaculo.size();++ii){
+				fout2<<"x:\n";
+				std::vector<std::vector<double>> temp_obst = obstaculo[ii];
+				for (int j = 0; j < temp_obst.size(); ++j) {
+					fout2<< temp_obst[j][0]<< "  ";
+				}
+				fout2<< "\n";
+			}
+			for(int ii=0;ii<obstaculo.size();++ii){
+				fout2<<"y:\n";
+				std::vector<std::vector<double>> temp_obst = obstaculo[ii];
+				for (int j = 0; j < temp_obst.size(); ++j) {
+					fout2<< temp_obst[j][1]<< "  ";
+				}
+				fout2<< "\n";
+			}
+			fout2<<"\n";
+			fout2.close();
+		
+			std::cout<<"Algoritmo de planificacion para calcular trayectorias:"<< endl <<"1: celdas rectangulares"<< endl << "2: Voronoi"<< endl;
+			int x;
+			std::cin>>x;
+
+          		if (x==1){  //calcular trayectorias con particion en cuadrados
+	    		paths = Process::process(width, height, obstaculo, robotcm, Targets, seq_celle_occ);
+            		// stampa dei punti trovati, "re_sizati" e centrati
+            		for (unsigned int j = 0; j < paths.size(); j++)
+            		{                   			
+            			std::vector<std::vector <double> > path = paths[j];
+            			std::vector<std::vector <double> > path_metri;       			
+            			for (unsigned int k = 0; k < path.size(); k++)
+            			{
+            				vector<double> tempory;
+            				double conversion = (double)((int)(((path[k][0] + 1) * 25) - 12.5))/100;
+            				double conversion2 = (double)((int)(((path[k][1] + 1) * 25) - 12.5))/100;
+
+            				 //controllo per permettere, qualora la distanza dal primo punto
+            				 //del path rispetto alla posizione attuale risulti essere minore
+            				 //di 25 cm, di escludere quest'ultimo dal percorso da inviare al robot
+            				if(k == 0){
+            					double dist_new = std::sqrt((((conversion) - (robotcm[j][0]/100)) * ((conversion) - (robotcm[j][0]/100))) + (((conversion2) - (robotcm[j][1]/100)) * 							((conversion2) - (robotcm[j][1]/100))));
+            					if(dist_new < 0.25)
+            						std::wcout << "Escluso "<<conversion<<" e "<<conversion2<<std::endl;
+            					else{
+            						tempory.push_back(conversion);
+            						tempory.push_back(conversion2);
+            						path_metri.push_back(tempory);
+            						tempory.clear();
+            					}
+            				}
+            				else{
+            					tempory.push_back(conversion);
+            					tempory.push_back(conversion2);
+							//	per evitare che vadano fuori pista--->
+								if(tempory[0] <= 0.12)
+									tempory[0] = 0.30;
+								if(tempory[1] <= 0.12)
+									tempory[1] = 0.30;
+
+            					path_metri.push_back(tempory);
+            					tempory.clear();
+            				}
+            			}
+            			paths_metri.push_back(path_metri);
+
+            		}
+			/* - FIRST POINT HAS TO BE THE CURRENT POSITION (NORMALIZED IF NECESSARY) FOR EACH ROBOT OBTAINED BY THE CAMERA.*/
+            		for(int i = 0; i < nrobots; i++){
+				vector<double> first_point_current_pos;
+				double conv_uno = double(robotcm[i][0])/100;
+				double conv_due = double(robotcm[i][1])/100;
+				conv_uno = (int)(conv_uno*100)/25;
+				conv_uno = (double)((int)(((conv_uno + 1) * 25) - 12.5))/100;            				
+				conv_due = (int)(conv_due*100)/25;
+				conv_due = (double)((int)(((conv_due + 1) * 25) - 12.5))/100;  
+				first_point_current_pos.push_back(conv_uno);
+				first_point_current_pos.push_back(conv_due);
+						
+				paths_metri[i].insert(paths_metri[i].begin(),first_point_current_pos);
+			}
+			}// end if x==1
+
+			
+
+			if (x==2) //cálculo de trayectorias utilziando diagramas de Voronoi
+			{
+				paths = Process::processVoronoi((int)(largop*100),(int)(anchop*100), obstaculo, robotcm, Targets);
+            			// Impresión de los puntos encontrados
+            			for (unsigned int j = 0; j < paths.size(); j++)
+            			{                   			
+            				std::vector<std::vector <double> > path = paths[j];
+            				std::vector<std::vector <double> > path_metri;       			
+            				for (unsigned int k = 0; k < path.size(); k++)
+            				{
+            					vector<double> tempory;
+            					double conversion = (double)((int) path[k][0])/100;
+            					double conversion2 = (double)((int) path[k][1])/100;
+						tempory.push_back(conversion);
+            					tempory.push_back(conversion2);
+						path_metri.push_back(tempory);
+            					tempory.clear();
+            				}
+            				paths_metri.push_back(path_metri);
+            			}
+				vector<vector <double> > temp_path=paths[0];
+				/*for(int ii=0;ii<temp_path.size();++ii){
+					cout<< temp_path[ii][0]<< " , " << temp_path[ii][1] << "; ";
+
+				}
+				cout<< endl;*/
+
+				std::ofstream fout("paths.txt");
+				fout<<"[";
+				for(int ii=0;ii<paths.size();++ii){
+					std::vector<std::vector <double> > temppp = paths[ii];
+					for (int jj=0;jj<temppp.size();++jj){
+					fout<< temppp[jj][0]<< " , " << temppp[jj][1] << "; "<<"\n";
+					}
+					fout<<"]";
+				}
+				fout<<"\n";
+				fout.close();
+			} // END IF X==2
+
+		// PRINT COORDINATES OF THE ELEMENTS INVOLVED
+
+		cout<<"Robot positions (x(cm), y(cm), rad):"<< endl;
+      		for( int i=0;i<nrobots;i++)
+		{
+			theta=(atan2((punto2mundo[i].y-punto1mundo[i].y),(punto2mundo[i].x-punto1mundo[i].x)));
+			Robotmundo[i]=Point3f(Robotm[i].x,Robotm[i].y,theta);
+			cout<<"Robot["<<i+1<<"]=("<<robotcm[i][0]<<","<<robotcm[i][1]<<","<<robotcm[i][2]<<")"<<endl;
+		}
+		cout<<"Obstacles positions (cm):"<< endl;
+		for(unsigned int i = 0; i < obstaculo.size(); i++ ){
+			vector<vector<double>> mm = obstaculo[i];
+			for(unsigned int j = 0; j < mm.size(); j++ ){
+				cout<<"obstaculo["<<i+1<<"] esquina["<<j+1<<"]: "<<mm[j][0]<<" "<<mm[j][1]<<endl;
+			}
+			cout<<endl;
+		}
+		cout<<"Platform boundaries (cm):"<< endl;
+		std::wcout<<"width: "<<largop*100<<std::endl;
+		std::wcout<<"height: "<<anchop*100<<std::endl;
+
+		cout<<"Paths (cm):"<< endl;
+		for(unsigned int i = 0; i < nrobots; i++ ){
+			vector<vector<double>> mm = paths[i];
+			cout<<"Robot "<<i<<": "<<endl;
+			for(unsigned int j = 0; j < mm.size(); j++ ){
+				cout<<mm[j][0]<<" , "<<mm[j][1]<<" / ";
+			}
+			cout<<endl;
+		}
 		
 
-		//std::cout << "obstacles after filter: " << std::endl;			//escribe la matriz obstaculo tras haber pasado por la funcion
-		//for (int i = 0; i < obstaculo.size(); ++i) {
-		//std::vector<std::vector<double>> temp_obst = obstaculo[i];
-		//for (int j = 0; j < temp_obst.size(); ++j) {
-		//	std::cout << temp_obst[j][0] << " " << temp_obst[j][1] << " / ";
-		//}
-		//std::cout << std::endl;
-		//}
-		//std::cout << "fin" << std::endl;
-
-            	if(counttt == 0){   //Primera vez que se ejecuta el programa (calculo de trayectorias y envio al robot)
-					
-					obstacles_filter(&obstaculo, area_minima);
-
-					
-					/* - FIRST POINT HAS TO BE THE CURRENT POSITION (NORMALIZED IF NECESSARY) FOR EACH ROBOT OBTAINED BY THE CAMERA.*/
-					for (int i = 0; i < nrobots; i++) {
-						vector<double> first_point_current_pos;
-						double conv_uno = double(robotcm[i][0]) / 100;
-						double conv_due = double(robotcm[i][1]) / 100;
-						conv_uno = (int)(conv_uno * 100) / 25;
-						conv_uno = (double)((int)(((conv_uno + 1) * 25) - 12.5)) / 100;
-						conv_due = (int)(conv_due * 100) / 25;
-						conv_due = (double)((int)(((conv_due + 1) * 25) - 12.5)) / 100;
-						first_point_current_pos.push_back(conv_uno);
-						first_point_current_pos.push_back(conv_due);
-
-						paths_metri[i].insert(paths_metri[i].begin(), first_point_current_pos);
-					}
-			
-
-					//ProcessVoronoi
-
-			
-			
-					paths = Process::processVoronoi((int)(largop*100),(int)(anchop*100), obstaculo, robotcm, Targets);
-            			
-					for (unsigned int j = 0; j < paths.size(); j++) {
-
-						std::vector<std::vector <double> > path = paths[j];
-						std::vector<std::vector <double> > path_metri;
-						for (unsigned int k = 0; k < path.size(); k++) {
-							vector<double> tempory;
-							double conversion = (double)((int)path[k][0]) / 100;
-							double conversion2 = (double)((int)path[k][1]) / 100;
-							tempory.push_back(conversion);
-							tempory.push_back(conversion2);
-							path_metri.push_back(tempory);
-							tempory.clear();
-						}
-						paths_metri.push_back(path_metri);
-					}
-
-					vector<vector <double> > temp_path=paths[0];
-						for(int ii=0;ii<temp_path.size();++ii){
-							cout<< temp_path[ii][0]<< " , " << temp_path[ii][1] << "; ";
-						}
-					cout<< endl;
-
-					std::ofstream fout("paths.txt");
-					fout<<"[";
-					for(int ii=0;ii<temp_path.size();++ii){
-						fout<< temp_path[ii][0]<< " , " << temp_path[ii][1] << "; "<<"\n";
-					}
-					fout<<"\n";
-					fout.close();
-	
-
-					// PRINT COORDINATES OF THE ELEMENTS INVOLVED
-
-					cout<<"Robot positions (cm, cm, rad):"<< endl;
-      					for( int i=0;i<nrobots;i++)
-						{
-							theta=(atan2((punto2mundo[i].y-punto1mundo[i].y),(punto2mundo[i].x-punto1mundo[i].x)));
-							Robotmundo[i]=Point3f(Robotm[i].x,Robotm[i].y,theta);
-							cout<<"Robot["<<i+1<<"](x,y,theta):"<<robotcm[i][0]<<" "<<robotcm[i][1]<<" "<<robotcm[i][2]<<endl;
-						}
-					cout<<"Obstacles positions (cm):"<< endl;
-					for(unsigned int i = 0; i < obstaculo.size(); i++ ){
-						vector<vector<double>> mm = obstaculo[i];
-						for(unsigned int j = 0; j < mm.size(); j++ ){
-							cout<<"obstaculo["<<i+1<<"] esquina["<<j+1<<"]: "<<mm[j][0]<<" "<<mm[j][1]<<endl;
-						}
-						cout<<endl;
-					}
-					cout<<"Platform boundaries (cm):"<< endl;
-					std::wcout<<"width: "<<largop*100<<std::endl;
-					std::wcout<<"height: "<<anchop*100<<std::endl;
-
-					// PETRI NET S4PR
-
+		
+		// PETRI NET S4PR
+		if (nrobots>1){
 					Input_S4PR net(paths_metri);
 					m_0 = net.get_m_0();
 					pre = net.get_Pre();
@@ -939,7 +1009,7 @@ int main(int argc,char **argv)
 
 					control.push_back(1);
 					control.push_back(1 + paths_metri[0].size());
-		
+			
 					//SEND PATHS (in m)
 					//SEND IDLE PLACES
 					for (unsigned int i = 0; i < paths_metri.size(); ++i) {
@@ -947,81 +1017,95 @@ int main(int argc,char **argv)
 						std::vector<std::vector<double>> temp_path_to_send;
 						for (unsigned int j = 0; j < 1; ++j) {
 							std::vector<double> temp;
+							
 							temp.push_back(temp_path[j][0]);
 							temp.push_back(temp_path[j][1]);
 							temp_path_to_send.push_back(temp);
+							//cout<<"R"<<i<<" path to send: "<< temp_path_to_send[j][0] <<" , "<< temp_path_to_send[j][1] << endl;
 						}
 						paths_to_send.push_back(temp_path_to_send);
 						control_access.push_back(true);
 					}
+		} else {
+					cout<<"transmitting path to R1:";
+            				for(unsigned int i = 0; i < paths_metri.size(); i++){
+            					send_path_WiFi(paths_metri[i], i+1);
+            					//usleep(4000000);
+            				}
+		
 
-            		for(unsigned int i = 0; i < paths_to_send.size(); i++){
-            			send_path_WiFi(paths_to_send[i], i+1);
-            			usleep(4000000);
-            		}
-            		
-            		//send_destinos_WiFi(Targets);
-            		//usleep(4000000);
-            		//send_seq_cell_occ_WiFi(seq_celle_occ);
-            		//usleep(4000000);
-
-            		for(int kkk = 0; kkk < 2; kkk++){
+            				for(int kkk = 0; kkk < 2; kkk++){
 						for(unsigned int i=0;i<nrobots;i++){								
 							send_packet_WiFi((robotcm[i][0]/100),(robotcm[i][1]/100),robotcm[i][2], i+1);
-							cout<<"inviando il pacchetto al robot (a partire da 1) "<<i +1 <<endl;
-							usleep(4000000);
+							cout<<"Sending updated position ("<< robotcm[i][0]/100 << "," << robotcm[i][1]/100 << "," << robotcm[i][2] << ") to robot "<< i+1 <<endl;
+							//usleep(500000);
 						}
 					}
+            	}
+		
             		
-            		
+		//Check if during the normalization phase there are equal initial points (two robots in the same position, which is not allowed) 
+		for(int i = 0; i < nrobots; i++){
+			vector<double> first_point_i = paths_metri[i][0];
+			for(int j = 0; j < nrobots; j++){
+				if(i != j){
+				//If the starting points are the same ...
+					if(first_point_i[0] == paths_metri[j][0][0] and first_point_i[1] == paths_metri[j][0][1]){
+					double tt = (robotcm[i][0]/100) - (robotcm[j][0]/100);
+					if( (robotcm[j][0]/100) - (robotcm[i][0]/100)  > 0.10)
+						paths_metri[j][0][0] = paths_metri[j][0][0] + 0.25;
+					else if((robotcm[j][1]/100) - (robotcm[i][1]/100)  > 0.10)
+						paths_metri[j][0][1] = paths_metri[j][0][1] + 0.25;
+					}
+				}								
+			}				
+		}
+					
+					
+		/*for(int i = 0; i < nrobots; i++){
+				std::wcout << "Initial point of robot "<<i+1<<" = " << paths_metri[i][0][0] << " " << paths_metri[i][0][1] << " (m) " << std::endl;
+		}*/
+
+            	counttt++; // Incremento por lo que solo envío las trayectorias una vez
+            	//for(int i = 0 ; i < nrobots; i++)
+            	//	std::wcout<<"Enviando el primer paquete de robot "<<i+1<<" : "<<(robotcm[i][0]/100)<<" "<<(robotcm[i][1]/100)<<" "<<(robotcm[i][2])<<std::endl;
             	
-					
-					//Check if during the normalization phase there are equal initial points (two robots in the same position, which is not allowed) 
-					for(int i = 0; i < nrobots; i++){
-						vector<double> first_point_i = paths_metri[i][0];
-						for(int j = 0; j < nrobots; j++){
-							if(i != j){
-							//If the starting points are the same ...
-								if(first_point_i[0] == paths_metri[j][0][0] and first_point_i[1] == paths_metri[j][0][1]){
-									double tt = (robotcm[i][0]/100) - (robotcm[j][0]/100);
-									if( (robotcm[j][0]/100) - (robotcm[i][0]/100)  > 0.10)
-										paths_metri[j][0][0] = paths_metri[j][0][0] + 0.25;
-									else if((robotcm[j][1]/100) - (robotcm[i][1]/100)  > 0.10)
-									paths_metri[j][0][1] = paths_metri[j][0][1] + 0.25;
-								}
-							}								
-						}				
-					}
-					
-					
-					for(int i = 0; i < nrobots; i++){
-						std::wcout << "Initial point of robot "<<i+1<<" = " << paths_to_send[i][0][0] << " " << paths_to_send[i][0][1] << " (m) " << std::endl;
-					}
-
-					counttt++; // incremento così invio solo  una volta le traiettorie
-            		for(int i = 0 ; i < nrobots; i++)
-            			std::wcout<<"invio primo pacchetto del robot "<<i+1<<" : "<<(robotcm[i][0]/100)<<" "<<(robotcm[i][1]/100)<<" "<<(robotcm[i][2])<<std::endl;
-            		cout<<"END SETTING UP, CONTINUE? "<<endl;
-            		cin.get();
-            		cin.get();
-
+/*		cout<<"END SETTING UP, CONTINUARE? (INVIO)"<<endl;
+            	cin.get();
+            	//cin.get();*/
+		
+		
+		fout3.open("robotcm.txt", std::ofstream::out | std::ofstream::app);
+		fout3<<"[";							
+		fout3<< robotcm[0][0]<< " , " << robotcm[0][0]<< "; ";							
+		
+		fout3.close();
+		
             	}// END IF COUNT==0
     				
     				
-  
-            	if(counttt != 0){ cout<<" count!=0" << endl;
+  		
+            	if(counttt != 0){ //cout<<" count!=0" << endl;
 
+		    if(time_counter > (double)(NUM_SECONDS * CLOCKS_PER_SEC)){
+            				//cout<<"time_counter: " << time_counter << endl;
+					//cout<<"num_sec " << NUM_SECONDS * CLOCKS_PER_SEC << endl;
+				
+			if (nrobots>1){
+				int it = 0;
+				cout<<"NUEVA ITERACION: "<<endl;
+				for (unsigned int i = 0; i < paths_metri.size(); ++i) {
+					std::cout << "R" << i+1 <<  std::endl;
+					if (control_access[i]) {
+						std::vector<std::vector<double>> temp_path = paths_metri[i];
+						std::vector<std::vector<double>> temp_path_to_send = paths_to_send[i];
+						paths_to_send[i].clear();
+						cout<<"*******************************"<<endl;
+						int j = control[i];
+						std::vector<double> temp;
+						std::vector<int> resources_involved = search_in_matrix(j - 1, pre, resources);
 
-					int it = 0;
-					for (unsigned int i = 0; i < paths_metri.size(); ++i) {
-						if (control_access[i]) {
-							std::vector<std::vector<double>> temp_path = paths_metri[i];
-							std::vector<std::vector<double>> temp_path_to_send = paths_to_send[i];
-							paths_to_send[i].clear();
-							for (unsigned int j = control[i]; j < (control[i] + 1); ++j) {
-								std::vector<double> temp;
-								//std::cout << j;
-								std::vector<int> resources_involved = search_in_matrix(j - 1, pre, resources);
+							if (!resources_involved.empty()){
 								if (resource_available(resources_involved, &m_0)) {
 									pick_token(resources_involved, &m_0);
 									if (it_while != 1) {
@@ -1034,111 +1118,184 @@ int main(int argc,char **argv)
 									temp.push_back(temp_path[j - it - correccion_eliminacion][1]);
 									temp_path_to_send.push_back(temp);
 									modo[i] = "active";
+									cout << "R" << i+1 << " modo ACTIVO. Asignados "<<resources_involved.size()<<" recursos compartidos: "<<resources_involved[0]<<endl;
+									
+									temp.clear();
 								}
-								else { std::cout << "R" << i << " modo espera" << std::endl;
-									modo[i] = "wait"; }
+								else { std::cout << "R" << i+1 << " modo espera" << std::endl;
+								modo[i] = "wait"; }
 							}
-							paths_to_send.at(i) = temp_path_to_send;
-							it = temp_path.size();
-						}
+							else { modo[i] = "active";
+								std::cout << "R" << i+1 << " modo ACTIVO. Calculando trayectoria hasta proxima region compartida" << std::endl;
+								int ittt=1;
+
+							 	while (resources_involved.empty()){
+									if (ittt!=1) {
+										control.at(i) = j + 1;
+										j = control[i];
+									}
+							if (it_while != 1) {
+										temp.push_back(temp_path[j - it - correccion_eliminacion - 1][0]);
+										temp.push_back(temp_path[j - it - correccion_eliminacion - 1][1]);
+										temp_path_to_send.push_back(temp);
+										temp.clear();
+									}	
+
+									temp.push_back(temp_path[j - it - correccion_eliminacion][0]);
+									temp.push_back(temp_path[j - it - correccion_eliminacion][1]);
+
+									temp_path_to_send.push_back(temp);
+
+
+									
+									resources_involved = search_in_matrix(j - 1 + 1, pre, resources);
+									temp.clear();
+									++ittt;
+								}
+							}
+						
+						paths_to_send.at(i) = temp_path_to_send;
 					}
+					it = paths_metri[i].size();
+				}
 
 				/*std::cout << "Marcado inicial  ";
 				for (unsigned int i = 0; i < m_0.size(); ++i) {
 					std::cout << m_0[i] << " ";
 				}
 				std::cout << std::endl;*/
-
-					for (unsigned int i = 0; i < paths_to_send.size(); ++i) {
-
-						if (!paths_to_send[i].empty()) {
-							send_path_WiFi(paths_to_send[i], i+1);
-            				usleep(4000000);
-						}
+				cout<<"Paths to send (cm):"<< endl;
+				for(unsigned int i = 0; i < paths_to_send.size(); i++ ){
+					vector<vector<double>> mm = paths_to_send[i];
+					cout<<"Robot "<<i<<": "<<endl;
+					for(unsigned int j = 0; j < mm.size(); j++ ){
+						cout<<mm[j][0]<<" , "<<mm[j][1]<<" / ";
 					}
-			
-					for (unsigned int ii = 0; ii < paths_to_send.size(); ++ii) {
-						std::vector<std::vector<double>> temp_paths_metri = paths_metri[ii];
-						if ( (robotcm[ii][0]/100==temp_paths_metri[control[ii]][0]) && (robotcm[ii][1]/100==temp_paths_metri[control[ii]][1]) ){
-					
-							std::vector<int> resources_involved = search_in_matrix(control[ii], post, resources);
-							return_token(resources_involved, &m_0);
-							int xx = control[ii];
-							control.at(ii) = xx + 1;
-							paths_to_send[ii].clear();
-							control_access[ii] = true;
-
-						} else if (modo[ii] == "wait") { //Robot en modo espera.
-
-							control_access[ii] = true;
-							paths_to_send[ii].clear();
-
-						} else {				//El robot todavía no ha llegado al destino de la secuencia enviada.
-
-							control_access[ii] = false;
-							paths_to_send[ii].clear();
-
-						}
-					
-					}
+					cout<<endl;
+				}
+				cout<<"**************"<<endl;
+				//for (unsigned int i = 0; i < paths_to_send.size(); ++i) {
 				
-				
-
-					int travleled_path = 0;
-			
-					for (unsigned int jj = 0; jj < control.size(); ++jj) {
-						travleled_path = travleled_path + paths_metri[jj].size() + correccion_eliminacion;
-						//std::cout << "paths_metri.size: " << paths_metri[jj].size() << endl;
-						//std::cout << "traveled_path: " << travleled_path << endl;
-						//std::cout << "control[jj]: " << control[jj] << endl;
-						if (control[jj] > (travleled_path - 1)) { 
-							correccion_eliminacion = (paths_metri.size() - jj - 1)*paths_metri[jj].size();
-							paths_metri.erase(paths_metri.begin() + jj);
-							paths_to_send.erase(paths_to_send.begin() + jj);
-							control.erase(control.begin() + jj);
-						}
+					if (!paths_to_send[0].empty()) {
+						cout<< "transmitting path to R1"<<endl;
+						send_path_WiFi(paths_to_send[0], 0+1);
+					} else cout<< "no path to be transmitted R1"<<endl;
+					if (!paths_to_send[0].empty()) {
+						cout<< "transmitting path to R1"<<endl;
+						send_path_WiFi(paths_to_send[0], 0+1);
 					}
-					//std::cout << "control size: " << control.size() << endl;
-					++it_while;
+					
+					
+					if (!paths_to_send[1].empty()) {
+						cout<< "transmitting path to R2"<<endl;
+						send_path_WiFi(paths_to_send[1], 1+1);
+					} else cout<< "no path to be transmitted R2"<<endl;
+					if (!paths_to_send[1].empty()) {
+						cout<< "transmitting path to R2"<<endl;
+						send_path_WiFi(paths_to_send[1], 1+1);
+					}
+					
+					
+				//}
+				cout<<"**************"<<endl;
+				int control_posicion=0;
+				for (unsigned int ii = 0; ii < paths_to_send.size(); ++ii) {
+					cout<<"R "<<ii<<":"<<endl;
+					std::vector<std::vector<double>> temp_paths_metri = paths_metri[ii];
+					cout<<"control de region: "<< control[ii]-control_posicion<<endl<<"-----"<<temp_paths_metri[control[ii]-control_posicion][0]<<" , "<<temp_paths_metri[control[ii]-control_posicion][1]<<endl;
+					if (distancia(robotcm[ii],temp_paths_metri[control[ii]-control_posicion],0.20)){
+						cout<<"Robot en area de destino, se permite acceso a la generacion de la nueva secuencia de regiones"<<endl;
+						std::vector<int> resources_involved = search_in_matrix(control[ii], post, resources);
+						return_token(resources_involved, &m_0);
+						int xx = control[ii];
+						control.at(ii) = xx + 1;
+						paths_to_send[ii].clear();
+						control_access[ii] = true;
 
-
-            		
-					if(time_counter > (double)(NUM_SECONDS * CLOCKS_PER_SEC)){
+					} else if (modo[ii] == "wait") { //Robot en modo espera.
+						cout<<"El robot se encuentra en modo espera."<<endl;
+						control_access[ii] = true;
+						paths_to_send[ii].clear();
 						
-						for(int m = 0; m<=3;m++){
-							bool dd = false;
+					} else {				//El robot todavía no ha llegado al destino de la secuencia enviada.
+
+						control_access[ii] = false;
+						paths_to_send[ii].clear();
+						cout<<"El robot todavia no ha llegado al destino de la secuencia enviada."<<endl;
+
+					}
+					control_posicion += paths_metri[ii].size();
+					
+				}
+				cout<<"**************"<<endl;
+				/*std::cout << "Marcado inicial  ";
+				for (unsigned int i = 0; i < m_0.size(); ++i) {
+					std::cout << m_0[i] << " ";
+				}
+				std::cout << std::endl;
+
+				for (unsigned int t=0; t < control.size(); ++t) {
+					std::cout << "control " << t << ": " << control[t] << std::endl;
+				}*/
+
+				int travleled_path = 0;
+			
+				for (unsigned int jj = 0; jj < control.size(); ++jj) {
+					travleled_path = travleled_path + paths_metri[jj].size() + correccion_eliminacion;
+					//std::cout << "paths_metri.size: " << paths_metri[jj].size() << endl;
+					//std::cout << "traveled_path: " << travleled_path << endl;
+					//std::cout << "control[jj]: " << control[jj] << endl;
+					if (control[jj] > (travleled_path - 1)) { 
+						correccion_eliminacion = (paths_metri.size() - jj - 1)*paths_metri[jj].size();
+						paths_metri.erase(paths_metri.begin() + jj);
+						paths_to_send.erase(paths_to_send.begin() + jj);
+						control.erase(control.begin() + jj);
+					}
+				}
+				//std::cout << "control size: " << control.size() << endl;
+				++it_while;
+				cout<<"**************"<<endl;
+
+			}//fin nrobots>1
+					
+						cout<<"-----ACTUALIZACION DE LA POSICION------"<<endl<<endl;
+						for(int m = 0; m<=1; m++){
+							
+							
 							for(unsigned int i=0;i<nrobots;i++){
 								
 							// NON INVIARE PACCHETTI SE AL ROBOT I-ESIMO SE QUEST'ULTIMO E' CONTENUTO NEL VETTORE ROBOT_FERMARE 	   								
-								for(unsigned int j = 0; j < Robot_fermare.size(); j++)
-									if(i == Robot_fermare[j]){
-										cout<<"rob fermare = "<<i+1<<"che poi e' "<<Robot_fermare[j]<<endl;
-										dd = true;
-									}
 								
-								if(dd == false){
+								
+									
+									//if (!(robotcm[i][0]==1) && !(robotcm[i][1]==239) && !(robotcm[i][2]==0)){//Punto falso, marcador de la esquina sup izq
+									
 									send_packet_WiFi((robotcm[i][0]/100),(robotcm[i][1]/100),robotcm[i][2], i+1);
-									cout<<"inviando il pacchetto al robot (a partire da 1) "<<i +1 <<endl;
-									usleep(200000);
-								}
-								else{
-									cout<<"NOOON sto inviando il pacchetto al robot (a partire da 1) "<<i +1 <<endl;
-								}
+									cout<<"Robot["<<i+1<<"]=("<<robotcm[i][0]<<","<<robotcm[i][1]<<","<<robotcm[i][2]<<") -- (x,y,theta)"<<endl;
+									cout<<"sending updated position to robot "<<i +1 <<endl;
+									//usleep(2000000);
+									fout3.open("robotcm.txt",std::ofstream::out | std::ofstream::app);
+									fout3<< robotcm[i][0]<< " , " << robotcm[i][0]<< "; ";
+									fout3.close();
+									//}
+									
+									
 								
-								dd = false;
-								hh++;
+									
 							}
 						}
-					}
+			}//end time_counter 
+				
             		    		
             				counttt = 2;
-            				Robot_esclusiva.clear();
-            				Robot_fermare.clear();
+            				
 
             	} // END COUNT != 0
             	
             } // END AVER
             
+            
+             
 		imshow("marcadores detectados",Imagen);
 		key=cv::waitKey(tiempocap);//wait for key to be pressed
 		if(key == 10){
